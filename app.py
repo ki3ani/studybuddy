@@ -40,7 +40,6 @@ def logout():
     logout_user()
     return "Logged out successfully."
 
-# Main route to write a paper
 @app.route('/write-paper', methods=['GET', 'POST'])
 @login_required
 def write_paper():
@@ -89,3 +88,6 @@ def write_paper():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+
+    
