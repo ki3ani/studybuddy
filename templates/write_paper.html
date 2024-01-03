@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <title>Write Paper</title>
+</head>
+<body>
+    <h1>Welcome, {{ current_user.id }}!</h1>
+    <h2>Write Paper on "{{ topic }}"</h2>
+    <form action="{{ url_for('generate_content') }}" method="post">
+        <input type="hidden" name="topic" value="{{ topic }}">
+        <label for="content">Content:</label>
+        <textarea name="content" required></textarea>
+        <label for="commands">User Commands (separated by #):</label>
+        <input type="text" name="commands">
+        <button type="submit">Generate Content</button>
+    </form>
+    {% if generated_content %}
+        <h3>Generated Content:</h3>
+        <p>{{ generated_content }}</p>
+        <form action="{{ url_for('export_to_markdown') }}" method="post">
+            <input type="hidden" name="content" value="{{ generated_content }}">
+            <button type="submit">Export to Markdown</button>
+        </form>
+    {% endif %}
+    <a href="{{ url_for('select_topic') }}">Back to Select Topic</a>
+    <a href="{{ url_for('logout') }}">Logout</a>
+</body>
+</html>
