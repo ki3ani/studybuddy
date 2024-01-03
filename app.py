@@ -3,6 +3,7 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, cur
 import replicate
 import os
 from dotenv import load_dotenv
+from flask_weasyprint import HTML, render_pdf
 
 # Load environment variables from the .env file
 load_dotenv()
@@ -19,6 +20,7 @@ login_manager.login_view = 'login'
 class User(UserMixin):
     def __init__(self, id):
         self.id = id
+        self.papers = []
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -38,79 +40,52 @@ def logout():
     logout_user()
     return "Logged out successfully."
 
-# Main route to select a topic
-@app.route('/')
-@login_required
-def select_topic():
-    return render_template('select_topic.html')
-
-# Route to write a paper
-@app.route('/write-paper', methods=['POST'])
+# Main route to write a paper
+@app.route('/write-paper', methods=['GET', 'POST'])
 @login_required
 def write_paper():
-    topic = request.form.get('topic')
-    return render_template('write_paper.html', topic=topic)
+    if request.method == 'POST':
+        content = request.form.get('content')
+        save_option = request.form.get('save_option')
 
-# Route to generate content using Replicate API
-@app.route('/generate-content', methods=['POST'])
-@login_required
-def generate_content():
-    topic = request.form.get('topic')
-    content = request.form.get('content')
-    commands = request.form.get('commands')
-    styling = request.form.get('styling')
+        if not content:
+            return "Invalid input. Content is required."
 
-    if not topic or not content:
-        return "Invalid input. Topic and content are required."
+        # Process user commands
+        user_commands = content.lower().split('#')
+        user_commands = [cmd.strip() for cmd in user_commands if cmd.strip()]
 
-    # Process user commands
-    user_commands = commands.lower().split('#')
-    user_commands = [cmd.strip() for cmd in user_commands if cmd.strip()]
+        # Define Replicate API input prompt
+        input_prompt = content
 
-    # Define Replicate API input prompt
-    input_prompt = f"Write an essay on the topic: {topic}. {content}"
+        # Process user commands and modify input prompt accordingly
+        for cmd in user_commands:
+            input_prompt += f" #{cmd}"
 
-    # Process user commands and modify input prompt accordingly
-    for cmd in user_commands:
-        if cmd.startswith('explain'):
-            input_prompt += " #explain"
-        elif cmd.startswith('title'):
-            input_prompt += " #title"
-        elif cmd.startswith('summary'):
-            input_prompt += " #summary"
-        elif cmd.startswith('quote'):
-            input_prompt += " #quote"
-        elif cmd.startswith('questions'):
-            input_prompt += " #questions"
-        elif cmd.startswith('examples'):
-            input_prompt += " #examples"
-        elif cmd.startswith('compare'):
-            input_prompt += " #compare"
-        elif cmd.startswith('visualize'):
-            input_prompt += " #visualize"
-        elif cmd.startswith('related-topics'):
-            input_prompt += " #related-topics"
-        elif cmd.startswith('sources'):
-            input_prompt += " #sources"
+        # Use Replicate API for content generation
+        response = replicate.stream(
+            "meta/llama-2-70b-chat",
+            input={"prompt": input_prompt}
+        )
 
-    # Use Replicate API for content generation
-    response = replicate.stream(
-        "meta/llama-2-70b-chat",
-        input={"prompt": input_prompt}
-    )
+        generated_content = ''.join([str(event) for event in response])
 
-    generated_content = ''.join([str(event) for event in response])
+        # Save the generated content to the user's paper
+        current_user.papers.append(generated_content)
 
-    return render_template('write_paper.html', topic=topic, generated_content=generated_content)
+        # Save the paper based on user's preference (Markdown or PDF)
+        if save_option == 'markdown':
+            save_path = f"user_{current_user.id}_paper_{len(current_user.papers)}.md"
+            with open(save_path, 'w') as file:
+                file.write(generated_content)
+        elif save_option == 'pdf':
+            html = render_template('paper_template.html', content=generated_content)
+            save_path = f"user_{current_user.id}_paper_{len(current_user.papers)}.pdf"
+            HTML(string=html).write_pdf(save_path)
 
-# Route to export content to Markdown
-@app.route('/export-to-markdown', methods=['POST'])
-@login_required
-def export_to_markdown():
-    content = request.form.get('content')
-    with open('exported_content.md', 'w') as file:
-        file.write(content)
-    return send_file('exported_content.md', as_attachment=True)
+        return send_file(save_path, as_attachment=True)
+
+    return render_template('write_paper.html')
 
 if __name__ == '__main__':
     app.run(debug=True)
