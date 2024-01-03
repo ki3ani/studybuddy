@@ -1,0 +1,1 @@
+Hello! How can I assist you today? Are you looking for information on cars or perhaps searching for a specific type of vehicle? If you have any questions or need help finding something, feel free to ask and I'll do my best to assist you.

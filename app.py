@@ -4,6 +4,7 @@ import replicate
 import os
 from dotenv import load_dotenv
 from flask_weasyprint import HTML, render_pdf
+from flask import render_template_string
 
 # Load environment variables from the .env file
 load_dotenv()
@@ -26,19 +27,7 @@ class User(UserMixin):
 def load_user(user_id):
     return User(user_id)
 
-# Login route
-@app.route('/login')
-def login():
-    user = User(1)  # For simplicity, assume a single user
-    login_user(user)
-    return "Logged in successfully."
-
-# Logout route
-@app.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    return "Logged out successfully."
+# ...
 
 @app.route('/write-paper', methods=['GET', 'POST'])
 @login_required
@@ -78,16 +67,24 @@ def write_paper():
             with open(save_path, 'w') as file:
                 file.write(generated_content)
         elif save_option == 'pdf':
-            html = render_template('paper_template.html', content=generated_content)
+            html = render_template_string('<div>{{ content }}</div>', content=generated_content)
             save_path = f"user_{current_user.id}_paper_{len(current_user.papers)}.pdf"
             HTML(string=html).write_pdf(save_path)
 
-        return send_file(save_path, as_attachment=True)
+        # Display preview to the user
+        return render_template('preview.html', content=generated_content, save_option=save_option)
 
     return render_template('write_paper.html')
 
+# Add a new route to handle saving and continuing
+@app.route('/save-and-continue', methods=['POST'])
+@login_required
+def save_and_continue():
+    # Save the generated content to the user's paper
+    content = request.form.get('content')
+    current_user.papers.append(content)
+
+    # Clear the input area for the user to continue writing
+    return render_template('write_paper.html')
 if __name__ == '__main__':
-    app.run(debug=True)
-
-
-    
+    app.run(debug=False)
